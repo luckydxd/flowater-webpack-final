@@ -61,10 +61,13 @@ self.addEventListener("activate", (event) => {
   console.log("Service Worker activated");
 });
 
-// ambatukam
-
+// Push Notification
 self.addEventListener("push", (event) => {
   console.log("Push event received:", event);
+
+  const BASE_PATH = self.registration.scope
+    .replace(location.origin, "")
+    .replace(/\/$/, "");
 
   let data = {};
   try {
@@ -73,16 +76,16 @@ self.addEventListener("push", (event) => {
     data = {
       title: "New Notification",
       body: "You have a new notification",
-      icon: "/icons/icon-192x192.png",
+      icon: `${BASE_PATH}/icons/icon-192x192.png`,
     };
   }
 
   const options = {
     body: data.body || "You have a new notification",
-    icon: data.icon || "/icons/icon-192x192.png",
-    badge: "/icons/badge-72x72.png",
+    icon: data.icon || `${BASE_PATH}/icons/icon-192x192.png`,
+    badge: `${BASE_PATH}/icons/badge-72x72.png`,
     data: {
-      url: data.url || "/",
+      url: data.url || `${BASE_PATH}/`,
     },
   };
 
