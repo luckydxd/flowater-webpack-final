@@ -49,11 +49,11 @@ document.addEventListener("DOMContentLoaded", () => {
   initializeApp().catch(console.error);
 });
 
-// Service Worker Registration
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
-    const swUrl =
-      process.env.NODE_ENV === "development" ? "/sw.dev.js" : "/sw.js";
+    const isLocalhost = location.hostname === "localhost";
+
+    const swUrl = isLocalhost ? "/sw.dev.js" : "/flowater-webpack-final/sw.js";
 
     navigator.serviceWorker
       .register(swUrl)
