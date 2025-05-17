@@ -1,1 +1,0 @@
-self.addEventListener("push",(function(t){var i=t.data.json(),n={body:i.body,icon:"icon.png",data:{url:i.url}};t.waitUntil(self.registration.showNotification(i.title,n))}));
