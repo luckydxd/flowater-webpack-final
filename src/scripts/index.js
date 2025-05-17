@@ -51,15 +51,22 @@ document.addEventListener("DOMContentLoaded", () => {
 
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
-    const isLocalhost = location.hostname === "localhost";
+    const isDev =
+      location.hostname === "localhost" || location.hostname === "127.0.0.1";
 
-    const swUrl = isLocalhost ? "/sw.dev.js" : "/flowater-webpack-final/sw.js";
+    const swUrl = isDev
+      ? "/sw.dev.js"
+      : `${
+          location.pathname.startsWith("/flowater-webpack-final")
+            ? "/flowater-webpack-final"
+            : ""
+        }/sw.js`;
 
     navigator.serviceWorker
       .register(swUrl)
-      .then((reg) => console.log("Service Worker registered:", reg))
+      .then((reg) => console.log("✅ Service Worker registered:", reg.scope))
       .catch((err) =>
-        console.error("Service Worker registration failed:", err)
+        console.error("❌ Service Worker registration failed:", err)
       );
   });
 }
