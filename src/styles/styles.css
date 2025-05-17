@@ -1,7 +1,6 @@
 * {
   margin: 0;
   padding: 0;
-
   box-sizing: border-box;
 }
 
@@ -32,6 +31,12 @@ header {
   gap: 30px;
 }
 
+#app-shell {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
 /* NAVBAR STYLE */
 .brand-name {
   font-size: 1.5rem;
@@ -53,6 +58,25 @@ header {
 .nav-list li a:hover {
   text-decoration: none;
   color: #92a3fd;
+}
+
+/* styles.css */
+.install-button {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  padding: 10px 20px;
+  background-image: linear-gradient(to right, #c58bf2, #eea4ce);
+  color: white;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+  z-index: 1000;
+}
+
+.install-button:hover {
+  background-color: #c58bf2;
 }
 
 /* Hero Section Styles */
@@ -142,6 +166,22 @@ header {
 }
 
 /* CTA BUTTON */
+
+.notif {
+  display: inline-block;
+  background-image: linear-gradient(to right, #92a3fd, #9dceff);
+  color: white !important;
+  border-radius: 6px;
+  padding: 10px 20px !important;
+  text-decoration: none;
+  border: none;
+}
+
+.notif:hover {
+  background-image: linear-gradient(to bottom, #92a3fd);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
 
 .cta-button {
   display: inline-block;
@@ -298,7 +338,7 @@ header {
 
 /* MAIN */
 .main-content {
-  padding-block: 20px;
+  padding-block: 10px;
 }
 
 /* Auth Styles */
@@ -584,6 +624,13 @@ header {
 .btn-primary {
   background-color: #92a3fd;
   color: white;
+}
+
+button svg {
+  vertical-align: middle;
+  margin-right: 8px;
+  fill: none;
+  stroke: currentColor;
 }
 
 .btn-primary:hover {

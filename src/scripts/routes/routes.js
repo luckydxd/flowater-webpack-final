@@ -4,6 +4,7 @@ import AddLaporanPage from "../pages/addlaporan/add-laporan-page";
 import LoginPage from "../pages/auth/login/login-page";
 import RegisterPage from "../pages/auth/register/register-page";
 import DetailPage from "../pages/detail/detail-page";
+import NotFoundPage from "../pages/error/404";
 
 import {
   checkAuthenticatedRoute,
@@ -18,6 +19,11 @@ const routes = {
 
   "/login": () => checkUnauthenticatedRouteOnly(new LoginPage()),
   "/register": () => checkUnauthenticatedRouteOnly(new RegisterPage()),
+
+  "*": () => new NotFoundPage(),
+
+  // Alternatif jika ingin menangani error khusus
+  "/404": () => new NotFoundPage(),
 };
 
 export default routes;

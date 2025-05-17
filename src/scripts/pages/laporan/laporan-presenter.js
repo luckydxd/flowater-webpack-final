@@ -1,4 +1,5 @@
 import { StoryAPI } from "../../data/api";
+import StoryIDB from "../../data/story-idb";
 
 export default class LaporanPresenter {
   constructor(view) {
@@ -14,9 +15,17 @@ export default class LaporanPresenter {
         return;
       }
 
+      await StoryIDB.saveStories(listStory); // Simpan ke IndexedDB
       this.view.showStories(listStory);
     } catch (error) {
-      this.view.showError(error.message);
+      console.warn("Fetch failed. Try loading from IndexedDB...", error);
+      const localStories = await StoryIDB.getAllStories();
+
+      if (localStories.length > 0) {
+        this.view.showStories(localStories); // Tampilkan data lokal
+      } else {
+        this.view.showError("Gagal memuat data, dan tidak ada data lokal.");
+      }
     }
   }
 

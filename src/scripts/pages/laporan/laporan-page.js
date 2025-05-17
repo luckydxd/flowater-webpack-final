@@ -27,6 +27,8 @@ export default class LaporanPage {
       </section>
       <br>
       <section class="container">
+      <button id="clear-data-btn" class="cta-button danger">Hapus Data Lokal</button>
+
         <h1 style="text-align: center; margin-top:10px;">Laporan Pengguna</h1>
         <div id="stories-list" class="stories-grid"></div>
       </section>
@@ -36,6 +38,16 @@ export default class LaporanPage {
   }
 
   async afterRender() {
+    const clearBtn = document.getElementById("clear-data-btn");
+    if (clearBtn) {
+      clearBtn.addEventListener("click", async () => {
+        await import("../../data/story-idb").then((mod) =>
+          mod.default.clearAll()
+        );
+        alert("Data lokal dihapus.");
+      });
+    }
+
     const skipLink = document.querySelector(".skip-link");
     if (skipLink) {
       skipLink.addEventListener("click", (e) => {
@@ -132,6 +144,7 @@ export default class LaporanPage {
           </div>
           <div class="story-actions">
             <a href="#/detail/${story.id}" class="cta-button">Lihat Detail</a>
+            
           </div>
         </div>
       </div>

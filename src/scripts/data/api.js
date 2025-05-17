@@ -6,7 +6,7 @@ const ENDPOINTS = {
 };
 
 export const StoryAPI = {
-  async getAllStories({ page = 1, size = 10, location = 0 } = {}) {
+  async getAllStories({ page = 1, size = 12, location = 0 } = {}) {
     const response = await fetch(
       `${ENDPOINTS.ENDPOINT}/stories?page=${page}&size=${size}&location=${location}`,
       {
@@ -42,6 +42,20 @@ export const StoryAPI = {
       method: "POST",
       body: formData,
     });
+    return response.json();
+  },
+  async sendStoryNotification(storyId, notificationData) {
+    const response = await fetch(
+      `${ENDPOINTS.ENDPOINT}/stories/${storyId}/notify`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${getAuthToken()}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(notificationData),
+      }
+    );
     return response.json();
   },
 };

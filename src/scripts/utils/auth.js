@@ -4,9 +4,17 @@ export const setAuthToken = (token) => {
   window.dispatchEvent(new Event("authChange"));
 };
 
-export const getAuthToken = () => {
-  return localStorage.getItem("authToken");
-};
+export function getAuthToken() {
+  // Cek di localStorage
+  const token = localStorage.getItem("authToken");
+
+  // Validasi token
+  if (!token || token === "undefined" || token === "null") {
+    return null;
+  }
+
+  return token;
+}
 
 export const removeAuthToken = () => {
   localStorage.removeItem("authToken");

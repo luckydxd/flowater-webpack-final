@@ -2,6 +2,7 @@ import { StoryAPI } from "../../data/api";
 import { getAuthToken } from "../../utils/auth";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
+import { NotificationAPI } from "../../data/api";
 
 // Leaflet icon fix
 delete L.Icon.Default.prototype._getIconUrl;
@@ -423,6 +424,21 @@ export default class AddStoryPresenter {
         : await StoryAPI.addStoryGuest(formData);
 
       if (response.error) throw new Error(response.message);
+
+      if (Notification.permission === "granted") {
+        navigator.serviceWorker.ready.then((registration) => {
+          registration.showNotification("Laporan Terkirim", {
+            body: "Laporan Anda berhasil ditambahkan!",
+            icon: "/icons/icon-192x192.png", // sesuaikan dengan asset kamu
+            tag: "laporan-baru",
+            vibrate: [100, 50, 100],
+            data: {
+              dateOfArrival: Date.now(),
+              primaryKey: 1,
+            },
+          });
+        });
+      }
 
       alert("Laporan berhasil ditambahkan!");
       window.location.hash = "#/";

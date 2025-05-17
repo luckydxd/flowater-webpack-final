@@ -1,2 +1,2 @@
-APP_URL=<url_aplikasi>
+APP_URL= https://luckydxd.github.io/flowater-webpack-final/
 MAP_SERVICE_API_KEY=<api_key>

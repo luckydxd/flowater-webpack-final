@@ -1,7 +1,8 @@
 import routes from "../routes/routes";
 import { getActiveRoute } from "../routes/url-parser";
-import { isAuthenticated, removeAuthToken } from "../utils/auth";
+import { isAuthenticated, removeAuthToken, getAuthToken } from "../utils/auth";
 import CONFIG from "../config";
+import NotFoundPage from "../pages/error/404";
 
 import {
   isPushSupported,
@@ -9,11 +10,16 @@ import {
   subscribeUser,
   unsubscribeUser,
   getCurrentSubscription,
+  initializePushNotifications,
 } from "../utils/notif";
 
-// Di app.js, setelah import
-console.log("CONFIG:", CONFIG); // Harus menampilkan objek CONFIG
-console.log("VAPID Key:", CONFIG.VAPID_PUBLIC_KEY); // Harus menampilkan key
+function renderIcon(iconFn, size = 20) {
+  return iconFn({ size, strokeWidth: 1.5, color: "currentColor" });
+}
+
+console.log("Current permission:", Notification.permission);
+console.log("CONFIG:", CONFIG);
+console.log("VAPID Key:", CONFIG.VAPID_PUBLIC_KEY);
 
 class App {
   #content = null;
@@ -24,52 +30,70 @@ class App {
     this.#content = content;
     this.#drawerButton = drawerButton;
     this.#navigationDrawer = navigationDrawer;
-
-    this._handlePushNotification = this._handlePushNotification.bind(this);
+    this._setupRouter = this._setupRouter.bind(this);
+    this._renderPageContent = this._renderPageContent.bind(this);
+    this._deferredPrompt = null;
 
     this._setupDrawer();
     this.updateAuthMenu();
+
     this._setupRouter();
+    this._initializePushNotifications();
+    this._setupInstallPrompt();
 
     window.addEventListener("authChange", () => this.updateAuthMenu());
   }
 
-  async _handlePushNotification() {
-    try {
-      console.log("CONFIG in handler:", CONFIG); // Debug
+  _setupInstallPrompt() {
+    window.addEventListener("beforeinstallprompt", (e) => {
+      // Mencegah banner default ditampilkan
+      e.preventDefault();
 
-      if (!CONFIG?.VAPID_PUBLIC_KEY) {
-        throw new Error("VAPID key tidak ditemukan di konfigurasi");
+      // Simpan event supaya bisa dipanggil nanti
+      this._deferredPrompt = e;
+
+      // Cegah duplikat tombol
+      if (!document.getElementById("install-button")) {
+        this._showInstallButton();
       }
+    });
+  }
 
-      // 1. Cek dukungan browser
-      if (!isPushSupported()) {
-        throw new Error("Browser tidak mendukung Push Notification");
-      }
+  _showInstallButton() {
+    const installButton = document.createElement("button");
+    installButton.id = "install-button";
+    installButton.className = "install-button";
+    installButton.innerHTML =
+      '<i class="fas fa-download"></i> Install Flowater';
 
-      // 2. Cek izin
-      const hasPermission = await requestNotificationPermission();
-      if (!hasPermission) {
-        throw new Error("Izin notifikasi diperlukan");
-      }
+    installButton.addEventListener("click", this._installApp.bind(this));
+    document.body.appendChild(installButton);
+  }
 
-      // 3. Subscribe
-      await subscribeUser();
-      alert("Notifikasi berhasil diaktifkan!");
-    } catch (error) {
-      console.error("Error details:", {
-        error: error,
-        CONFIG: CONFIG, // Debug
-        isPushSupported: isPushSupported(), // Debug
-      });
-      alert(`Error: ${error.message}`);
-    }
+  async _installApp() {
+    if (!this._deferredPrompt) return;
+
+    // Tampilkan prompt
+    this._deferredPrompt.prompt();
+
+    const { outcome } = await this._deferredPrompt.userChoice;
+    console.log(
+      `User ${
+        outcome === "accepted" ? "accepted" : "dismissed"
+      } the install prompt`
+    );
+
+    // Hapus event setelah digunakan
+    this._deferredPrompt = null;
+
+    // Hapus tombol
+    const button = document.getElementById("install-button");
+    if (button) button.remove();
   }
 
   _setupRouter() {
     const handleNavigation = async () => {
       const url = getActiveRoute();
-
       try {
         if (document.startViewTransition) {
           await document.startViewTransition(() => this._renderPageContent(url))
@@ -89,30 +113,26 @@ class App {
 
   async _renderPageContent(url) {
     try {
-      const pageResolver = routes[url];
-      if (!pageResolver) {
-        window.location.hash = "#/";
-        return;
-      }
+      // Dapatkan route yang aktif
+      const routePath = getActiveRoute();
 
+      // Resolve halaman
+      const pageResolver = routes[routePath] || routes["*"]; // Gunakan 404 sebagai fallback
       const page =
         typeof pageResolver === "function" ? pageResolver() : pageResolver;
+
       this.#content.innerHTML = "";
-
       const renderedContent = await page.render();
-      if (renderedContent && renderedContent.style) {
-        renderedContent.style.viewTransitionName = "page-content";
-      }
-
       this.#content.appendChild(renderedContent);
 
       if (page.afterRender) {
         await page.afterRender();
       }
-
-      this.updateAuthMenu();
     } catch (error) {
-      window.location.hash = "#/";
+      // Fallback ke 404 jika ada error
+      const notFoundPage = new NotFoundPage();
+      this.#content.innerHTML = await notFoundPage.render();
+      await notFoundPage.afterRender();
     }
   }
 
@@ -148,7 +168,8 @@ class App {
           '<li><a href="#/">Beranda</a></li>',
           '<li><a href="#/laporan">List Laporan</a></li>',
           '<li><a href="#/addLaporan">Tambah Laporan</a></li>',
-          '<li><button id="notif-button" class="cta-button">Dapatkan Notifikasi!</button></li>',
+          '<li><button id="notif-button" class="notif">Memuat Status Notifikasi...</button></li>',
+
           `<li><a href="#" class="cta-button">Logout</a></li>`,
         ]
       : [
@@ -161,10 +182,7 @@ class App {
     // Notification button
 
     if (isAuth) {
-      const notifButton = document.getElementById("notif-button");
-      notifButton.addEventListener("click", async () => {
-        await this._handlePushNotification();
-      });
+      this._updateNotificationButton();
     }
 
     // Logout
@@ -179,7 +197,129 @@ class App {
     }
   }
 
-  async #setupPushNotification() {
+  // ----------Notification----------
+
+  async _initializePushNotifications() {
+    try {
+      const token = getAuthToken();
+
+      if (!token || typeof token !== "string" || !token.startsWith("Bearer ")) {
+        console.log(
+          "Jika User belum login, maka tidak menjalankan push notification"
+        );
+        return;
+      }
+
+      console.log("Memulai inisialisasi push notification...");
+      const success = await initializePushNotifications();
+
+      if (!success) {
+        console.log(
+          "Push notification tidak diaktifkan (browser tidak support atau tidak ada subscription)"
+        );
+      }
+    } catch (error) {
+      console.error("Gagal menginisialisasi push notification:", error.message);
+    }
+  }
+
+  async _handlePushNotification() {
+    try {
+      // Cek autentikasi
+      if (!isAuthenticated()) {
+        throw new Error("Anda harus login terlebih dahulu");
+      }
+
+      // Cek dukungan browser
+      if (!isPushSupported()) {
+        throw new Error("Browser tidak mendukung Push Notification");
+      }
+
+      // Cek izin notifikasi
+      const permission = await Notification.requestPermission();
+      if (permission !== "granted") {
+        throw new Error("Izin notifikasi ditolak");
+      }
+
+      // Dapatkan service worker registration
+      const registration = await navigator.serviceWorker.ready;
+
+      // Subscribe user
+      const subscription = await subscribeUser();
+      console.log("Subscription berhasil:", subscription);
+
+      alert("Notifikasi berhasil diaktifkan!");
+    } catch (error) {
+      console.error("Error:", error);
+      alert(`Gagal mengaktifkan notifikasi: ${error.message}`);
+    }
+  }
+
+  async _updateNotificationButton() {
+    const notifButton = document.getElementById("notif-button");
+    if (!notifButton) return;
+
+    try {
+      const isSubscribed = await this._checkSubscriptionStatus();
+
+      if (isSubscribed) {
+        notifButton.textContent = "Unsubscribe Notifikasi";
+        notifButton.onclick = async () => {
+          await this._unsubscribeFromNotifications();
+          this._updateNotificationButton();
+        };
+      } else {
+        notifButton.textContent = "Subscribe Notifikasi";
+        notifButton.onclick = async () => {
+          await this._subscribeToNotifications();
+          this._updateNotificationButton();
+        };
+      }
+    } catch (error) {
+      console.error("Error updating notification button:", error);
+      notifButton.textContent = "Error - Coba Lagi";
+      notifButton.onclick = async () => {
+        await this._handlePushNotification();
+        this._updateNotificationButton();
+      };
+    }
+  }
+
+  async _subscribeToNotifications() {
+    try {
+      const granted = await requestNotificationPermission();
+      if (!granted) {
+        alert("Izin notifikasi diperlukan untuk fitur ini");
+        return;
+      }
+
+      await subscribeUser();
+      alert("Notifikasi berhasil diaktifkan");
+      this.setupPushNotification(); // Update UI
+    } catch (error) {
+      alert(`Gagal mengaktifkan: ${error.message}`);
+    }
+  }
+
+  async _unsubscribeFromNotifications() {
+    try {
+      await unsubscribeUser();
+      alert("Notifikasi berhasil dimatikan");
+      this.setupPushNotification(); // Update UI
+    } catch (error) {
+      alert(`Gagal mematikan: ${error.message}`);
+    }
+  }
+
+  async _checkSubscriptionStatus() {
+    if (!isPushSupported()) return false;
+
+    const registration = await navigator.serviceWorker.ready;
+    const subscription = await registration.pushManager.getSubscription();
+    return !!subscription;
+  }
+
+  async setupPushNotification() {
     if (!isPushSupported()) {
       console.log("Browser tidak mendukung Push Notification");
       return;
@@ -192,14 +332,14 @@ class App {
 
     if (subscription) {
       notificationButton.textContent = "Nonaktifkan Notifikasi";
-      notificationButton.onclick = this.#handleUnsubscribe.bind(this);
+      notificationButton.onclick = this.handleUnsubscribe.bind(this);
     } else {
       notificationButton.textContent = "Aktifkan Notifikasi";
-      notificationButton.onclick = this.#handleSubscribe.bind(this);
+      notificationButton.onclick = this.handleSubscribe.bind(this);
     }
   }
 
-  async #handleSubscribe() {
+  async handleSubscribe() {
     try {
       const granted = await requestNotificationPermission();
       if (!granted) {
@@ -209,17 +349,17 @@ class App {
 
       await subscribeUser();
       alert("Notifikasi berhasil diaktifkan");
-      this.#setupPushNotification(); // Update UI
+      this.setupPushNotification(); // Update UI
     } catch (error) {
       alert(`Gagal mengaktifkan: ${error.message}`);
     }
   }
 
-  async #handleUnsubscribe() {
+  async handleUnsubscribe() {
     try {
       await unsubscribeUser();
       alert("Notifikasi berhasil dimatikan");
-      this.#setupPushNotification(); // Update UI
+      this.setupPushNotification(); // Update UI
     } catch (error) {
       alert(`Gagal mematikan: ${error.message}`);
     }
